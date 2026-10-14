@@ -2,6 +2,8 @@
 
 Date: 2026-10-13. Disposable spike: `/tmp/hn-mcp-v2-spike.AayvfOCe` (removed after validation). Python: 3.12.3. These observations are for the installed versions below, not a promise about future releases. No application code or dependency manifest was added to this repository.
 
+The authoritative Prompt 0.2 text is restored in [phase-0-requirements.md](phase-0-requirements.md). Status labels below describe historical execution where stated, and current official-document checks where stated; this audit did not repeat the removed spike. On 2026-10-14, the official [SDK v2 docs](https://py.sdk.modelcontextprotocol.io/whats-new/) described v2 as stable, and [PyPI](https://pypi.org/project/mcp/) listed 2.3.0 (uploaded 2026-10-02) as the latest release. The original install command used `mcp>=2,<3` and resolved 2.3.0. **VERIFIED (historical install and current source check).**
+
 ## Sources read
 
 - [What's new in v2](https://py.sdk.modelcontextprotocol.io/whats-new/)
@@ -140,3 +142,24 @@ rich>=13.9.4; extra == 'rich'
 **VERIFIED** For the SDK HTTP transport, `httpx2.MockTransport` with a supplied `httpx2.AsyncClient` intercepted requests to `/mcp`. A mock returning 421 received two SDK requests; a mock forwarding to the FastAPI ASGI app received three requests and let the SDK client list and call the tool successfully. The HTTP client was supplied through `Client(streamable_http_client(url, http_client=mock_client))`.
 
 **VERIFIED** For a future HN integration using plain `httpx.AsyncClient`, `respx 0.23.1` intercepted a mocked `GET https://hacker-news.firebaseio.com/v0/item/1.json` and returned `{'id': 1, 'title': 'HN item'}` without a network request. This establishes a workable test pair: `httpx2.MockTransport` for SDK transport tests and `respx` for HN API tests if the HN client is plain `httpx`. The actual HN integration does not exist yet and was not tested (**UNVERIFIED**). `pytest-httpx` was installed but not exercised (**UNVERIFIED**); no compatibility claim is made for it.
+
+## Phase 0 audit refresh (2026-10-14)
+
+The official [What's new in v2](https://py.sdk.modelcontextprotocol.io/whats-new/) and [ASGI mounting guide](https://py.sdk.modelcontextprotocol.io/run/asgi/) were rechecked on 2026-10-14. They confirm that v2 is the stable SDK line, uses `MCPServer` and the first-class `Client`, moves HTTP client integration to `httpx2`, supports the 2026-07-28 protocol while retaining compatibility with 2025-era clients, and requires the host lifespan to enter `mcp.session_manager.run()` when the MCP app is mounted. The ASGI guide also documents the Host allowlist and browser CORS configuration.
+
+Protocol nuance: modern 2026-07-28 HTTP requests do not use `Mcp-Session-Id`; legacy 2025-11-25 clients still use session semantics unless served with `stateless_http=True`. The historical spike observed both paths, including stateless legacy calls. Its multiworker and browser CORS behavior remains untested.
+
+This audit did not reinstall or rerun the disposable spike. The documented package/test results above are historical observations from the removed venv and script. In the current repository environment, Python is 3.12.3; `mcp`, FastAPI, `httpx`, `httpx2`, and `respx` are not installed. Therefore this refresh verifies current official documentation, not a fresh SDK runtime test.
+
+## Prompt 0.2 claim status
+
+| Claim | Status | Evidence and limit |
+| --- | --- | --- |
+| Disposable installation of stable SDK v2, FastAPI, and Uvicorn; exact resolved versions | VERIFIED (historical) | Install command, successful resolver output, and package versions are recorded above. PyPI/current SDK docs rechecked 2026-10-14 identify 2.3.0 as current stable. Spike environment was removed as required. |
+| Python requirement and dependency metadata, including httpx2 | VERIFIED (historical) | `Requires-Python >=3.10` and complete captured `Requires-Dist` output are recorded above. Current SDK installation docs state Python 3.11+; architecture targets 3.13. The discrepancy between package metadata and current docs is disclosed, not treated as runtime compatibility proof. |
+| `MCPServer`, structured output, `/mcp` mount, `/health`, and host lifespan | VERIFIED (historical) | Script description and observed memory/live HTTP output above show the class, structured content, route responses, and lifespan run context. The script itself is no longer available for independent replay. |
+| Host allowlist and default 421 behavior | VERIFIED (historical) | Captured default 421 and allowed-host success are recorded under Integration and transport behavior. |
+| Stateless HTTP and in-memory / real-HTTP clients | VERIFIED (historical) | Captured modern and legacy client results and session-header observations are recorded above. Multiworker behavior is UNVERIFIED. |
+| Error handling | VERIFIED (historical) | ToolError, protocol error, and redacted unexpected exception outcomes were captured for memory and live HTTP. Traceback suppression is not claimed; a traceback was observed server-side. |
+| Compatible HTTP mocking tools | VERIFIED (historical) | `httpx2.MockTransport` intercepted SDK transport and `respx` intercepted plain-httpx HN calls; `pytest-httpx` was installed but not exercised (UNVERIFIED). |
+| Browser CORS/Origin, multiworker behavior, real HN adapter, and current repeatability | UNVERIFIED | Not exercised in the spike/current audit; the temporary spike source was removed. |

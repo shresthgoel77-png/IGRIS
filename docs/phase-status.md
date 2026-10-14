@@ -2,18 +2,18 @@
 
 Current Phase: 0
 
-Completed Prompts: 0.1, 0.2, 0.3, 0.4 (architecture drafted; blueprint changes pending approval)
+Completed Prompts: 0.1 and 0.2 verified from initial commit and recorded disposable SDK spike; 0.3 documented with sourced limits, multiple live measurements, and request arithmetic; 0.4 architecture contract documented. See docs/phase-0-requirements.md for authoritative source.
 
-Verified Features: Documentation scaffolding; MCP Python SDK v2.3.0 local integration; official Cloudflare/Render free-tier constraints checked; six live HN API measurements and request-budget arithmetic recorded; architecture contract cross-referenced to those findings.
+Verified Features: Initial scaffold and initial commit; historical MCP SDK v2.3.0 integration, transport, error and mocking spike; official hosting facts rechecked; request-budget arithmetic recalculated; architecture contracts and Phases 1–10 criteria documented. This does not assert application features exist.
 
-Tests Passing: Disposable SDK v2 spike exited 0; six live HN API requests returned HTTP 200; deployment document arithmetic and source checks completed.
+Tests Passing: Historical disposable SDK spike exited 0; six historical and two refreshed upstream curl samples returned HTTP 200. Current `pytest --collect-only -q -p no:cacheprovider` exited 5 (no tests collected); there is no project test suite. An initial refreshed Firebase request failed DNS, then two retried read-only requests succeeded and are recorded in docs/deployment.md.
 
-Files Added: docs/phase-status.md, docs/architecture.md, docs/deployment.md, docs/technical-validation.md, README.md, .gitignore, LICENSE.
+Files Added: docs/phase-0-requirements.md.
 
-Files Modified: docs/phase-status.md (Prompts 0.2, 0.3, and 0.4), docs/deployment.md (Prompt 0.3), docs/architecture.md (Prompt 0.4).
+Files Modified: README.md, docs/architecture.md, docs/deployment.md, docs/phase-status.md, docs/technical-validation.md.
 
-Deployment Decision: Provisional Render Free native-Python baseline; Cloudflare Workers Free conditional on Phase 2 compatibility gates. No deployment yet.
+Deployment Decision: Unapproved proposal: one-working-day Cloudflare Workers Free gate; Render Free prototype fallback; no deployment or account created.
 
-Known Issues: Cloudflare runtime/dependency/resource gates, Algolia tree completeness and resource use, Render outbound-traffic threshold and cold-start client behavior, public CORS/Origin and multiworker behavior, and extractive research quality remain unverified. Cloudflare time box, Render baseline, Algolia-only retrieval, and research semantics need user approval as listed in docs/architecture.md.
+Known Issues: Approval required for host/timebox, Algolia-only nested-tree retrieval without Firebase fallback, and extractive keyword research semantics. Git metadata is read-only in this workspace, so the documentation changes cannot be committed here and the working tree is not clean. Cloudflare/Render application behavior, CORS, multiworker operation, full Python 3.13 app fit, and production suitability remain unverified.
 
-Next Phase: 1 (blocked until user approval)
+Next Phase: Phase 1 is blocked until the three architecture decisions above are approved; Phase 1 has not started.

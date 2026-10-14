@@ -15,6 +15,33 @@ All source rows were checked on **2026-10-13**. Each cited page supports the num
 | Render Free web service | **VERIFIED** [Free services](https://render.com/docs/free): local files are ephemeral; Free has one instance, and Render may suspend a Free service for unusually high service-initiated public-internet traffic, explicitly including external API calls. No numeric threshold is published there. | Use no local persistence. The outbound traffic threshold is a material **UNVERIFIED** operational risk for repeated research calls. |
 | Render billing and signup | **VERIFIED** Render's [free-tier article](https://render.com/articles/platforms-with-a-real-free-tier-for-developers-in-2026) explicitly says no credit card is required; the [first-deploy guide](https://render.com/docs/your-first-deploy) says no payment is required. The [FAQ](https://render.com/docs/faq#all-of-my-services-run-on-free-instances-can-i-still-be-billed) says a workspace **with** a payment method can be billed for excess outbound bandwidth or build minutes; without one, services/builds are suspended or disabled instead. | A card is not required today according to published Render material, but signup-flow behavior was not tested (**UNVERIFIED**). For strict $0, use Free and no payment method; accept quota suspension. |
 
+### Phase 0 source recheck (2026-10-14)
+
+The official [Cloudflare limits](https://developers.cloudflare.com/workers/platform/limits/), [Python package support](https://developers.cloudflare.com/workers/languages/python/packages/), [Render Free](https://render.com/docs/free), and [Render compute plans](https://render.com/docs/compute-plans) pages were rechecked. The limits above remain supported by those sources. Cloudflare's Python package guide uses `requires-python >=3.13` and limits package support to pure-Python, PyEmscripten, or Pyodide-available packages. This does not establish that this project's MCP dependency set runs there.
+
+The first additional Firebase sample attempt failed before connecting with `curl: (6) Could not resolve host: hacker-news.firebaseio.com` (status 000). The same read-only GETs were then executed with network access and succeeded. These are fresh observations, not latency guarantees:
+
+| Request | Decoded JSON | `time_total` | `time_starttransfer` | Observed shape |
+| --- | ---: | ---: | ---: | --- |
+| Firebase `/v0/item/25254772.json` (small story) | 292 B | 0.951 s | 0.950 s | Story object, 1 direct `kids` ID. |
+| Firebase `/v0/item/25254773.json` (comment) | 1,114 B | 0.713 s | 0.713 s | Comment object, no `kids`. |
+
+Exact commands and observed outputs:
+
+```sh
+curl --compressed --max-time 20 --retry 0 -sS 'https://hacker-news.firebaseio.com/v0/item/25254772.json' -o /tmp/hn-deploy-firebase-small.json -w 'status=%{http_code} bytes=%{size_download} total=%{time_total} connect=%{time_connect} ttfb=%{time_starttransfer}\n'
+curl --compressed --max-time 20 --retry 0 -sS 'https://hacker-news.firebaseio.com/v0/item/25254773.json' -o /tmp/hn-deploy-firebase-comment.json -w 'status=%{http_code} bytes=%{size_download} total=%{time_total} connect=%{time_connect} ttfb=%{time_starttransfer}\n'
+```
+
+```text
+status=200 bytes=292 total=0.950678 connect=0.174290 ttfb=0.950399
+status=200 bytes=1114 total=0.713027 connect=0.064011 ttfb=0.712690
+```
+
+The original DNS failure was environmental; it did not change repository files or produce an inferred measurement.
+
+Render's Free page explicitly cautions against using free instances for production applications. Its current compute-plan table lists the Free web service at 0.1 CPU and 512 MB RAM; Free has one instance, ephemeral files, spin-down, and the documented service-initiated traffic suspension risk. The provisional Render recommendation must therefore be treated as a hobby/prototype hosting candidate, not evidence of production suitability. Signup flow, this application's memory/CPU use, MCP client cold-start behavior, and the external-API traffic suspension threshold remain untested.
+
 Render's approximately one-minute spin-up is a documented expectation, not a measured cold start for this project. Cloudflare's 1 s number is a Worker startup **limit**, not measured response time. No service-level performance guarantee is inferred from either.
 
 ## Live upstream measurements
@@ -56,16 +83,16 @@ The high-comment Algolia search reported 967 comments, while `/items` JSON had 9
 
 ## Worst-case `research_hn` request budget
 
-Assumptions: one Algolia search returns 15 story IDs; analyze up to 50 comments per story; no cache hits, retries, redirects, or extra metadata calls. For Firebase, fetch each story once to obtain `kids`, then fetch 50 comment objects per story. For Algolia, fetch `/items/{id}` once per story, then select at most 50 comments locally from its nested tree. The latter downloads the entire tree; no endpoint-level 50-comment limit was observed. All counts are for **one inbound research request**, compared with Cloudflare's [50-subrequest Free limit](https://developers.cloudflare.com/workers/platform/limits/#subrequests).
+Assumptions: one Algolia search returns 15 story IDs; analyze up to 50 comments per story; no cache hits, redirects, or extra metadata calls. For Firebase, fetch each story once to obtain `kids`, then fetch 50 comment objects per story. For Algolia, fetch `/items/{id}` once per story, then select at most 50 comments locally from its nested tree. The latter downloads the entire tree; no endpoint-level 50-comment limit was observed. All counts are for **one inbound research request**, compared with Cloudflare's [50-subrequest Free limit](https://developers.cloudflare.com/workers/platform/limits/#subrequests).
 
-| Strategy | Arithmetic | Cloudflare 50? | Sample-based serial wall clock | Idealized 6-wide wall clock |
-| --- | ---: | --- | ---: | ---: |
-| Firebase individual comments | `1 search + 15 story fetches + (15 × 50) comment fetches = 766` | **No**, `766 > 50`; omitting story fetches still gives `1 + 750 = 751 > 50`. | `0.693511 + 765 × 0.953259 = 729.937 s` (~12.2 min). | `0.693511 + ceil(765 / 6) × 0.953259 = 122.711 s` (~2.0 min; 128 waves). |
-| Algolia nested items | `1 search + 15 item-tree fetches = 16` | **Yes**, `16 ≤ 50`; `50 - 16 = 34` subrequests remain before redirects/retries/other calls. | `0.693511 + 15 × 2.427612 = 37.108 s`. | `0.693511 + ceil(15 / 6) × 2.427612 = 7.976 s` (3 waves). |
+| Strategy | First attempts | With one retry per GET | Cloudflare 50? | Sample-based serial wall clock | Idealized 6-wide wall clock |
+| --- | ---: | ---: | --- | ---: | ---: |
+| Firebase individual comments | `1 + 15 + (15 × 50) = 766` | `1,532` | **No**, both exceed 50; even omitting story fetches gives `1 + 750 = 751`. | `0.693511 + 15×0.953259 + 750×0.713027 = 549.763 s` (~9.2 min). | `0.693511 + ceil(15/6)×0.953259 + ceil(750/6)×0.713027 = 92.682 s` (~1.5 min; dependency stages honored). |
+| Algolia nested items | `1 + 15 = 16` | `32` | **Yes** with max retries, `32 ≤ 50`; 18 calls remain before redirects/other calls. | `0.693511 + 15×2.427612 = 37.108 s`. | `0.693511 + ceil(15/6)×2.427612 = 7.976 s` (3 waves). |
 
-The wall-clock columns are **calculated**, not observed end-to-end. They use the 15-hit search latency (`0.693511 s`), the one large Algolia tree latency (`2.427612 s`), and the one Firebase **story** latency (`0.953259 s`) from the curl table. Firebase comment latency was not measured (**UNVERIFIED**); story latency is only a proxy. Six-wide assumes equal-duration concurrent calls, no contention or upstream throttling, and no extra JSON processing. Cloudflare's published rule concerns connections waiting for headers, so six is a conservative design cap rather than a measured throughput ceiling. Render has no six-connection figure in the sources used here; the same cap is shown only for comparison.
+The retry column models at most one retry on every GET (two attempts each); it does not assume that retries are used. Wall-clock columns model successful first attempts only and are **calculated**, not observed end-to-end. Firebase serial time uses the 15-hit Algolia search latency (`0.693511 s`), the large Firebase story latency (`0.953259 s`), and the new Firebase comment latency (`0.713027 s`). Six-wide Firebase time honors the dependency stages: story lookups precede comment lookups. Algolia uses the large tree sample (`2.427612 s`). Point estimates assume equal-duration calls per stage, no contention/upstream throttling, no retries, and no JSON processing. Cloudflare's published rule concerns connections waiting for response headers, so six is a conservative design cap rather than a measured throughput ceiling. Render has no six-connection figure in the sources used here; the same cap is shown only for comparison.
 
-At the sampled large-tree size, `43,229 + (15 × 575,777) = 8,679,884 B` (~8.28 MiB) of decoded JSON would be transferred before selecting 50 comments from each tree. This is a **calculated sample scenario**, not a maximum payload. CPU and peak memory for 15 trees on either host are **UNVERIFIED**. Redirects and retries could raise Cloudflare's subrequest count; the 16-call path has 34-call headroom only under the assumptions above.
+At the sampled large-tree size, `43,229 + (15 × 575,777) = 8,679,884 B` (~8.28 MiB) of decoded JSON would be transferred before selecting 50 comments from each tree. This is a **calculated sample scenario**, not a maximum payload. CPU and peak memory for 15 trees on either host are **UNVERIFIED**. The one-retry upper bound leaves 18 of Cloudflare's 50 subrequests for redirects/other calls on the Algolia path; disabling redirects and avoiding extra calls is part of the design.
 
 ## Decision matrix and Phase 2 plan
 
